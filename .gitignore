@@ -7,10 +7,21 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Dependencies
 node_modules
 dist
 dist-ssr
 *.local
+
+# Firebase
+firebase-debug.log
+.firebase/
+.firebaserc
+
+# Environment Variables (Prevents sensitive data leaks)
+.env
+.env.local
+.env.*.local
 
 # Editor directories and files
 .vscode/*
