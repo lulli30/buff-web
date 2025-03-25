@@ -1,14 +1,38 @@
-import React, { useState } from "react";
+import React, { useState, FormEvent } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { Link } from "react-router-dom";
 
 interface LoginFormProps {
-  handleLogin: () => void;
+  handleGoogleLogin: () => Promise<void>;
+  handleEmailLogin: (email: string, password: string) => Promise<void>;
+  isLoading: boolean;
 }
 
-const LoginForm: React.FC<LoginFormProps> = ({ handleLogin }) => {
+const LoginForm: React.FC<LoginFormProps> = ({
+  handleGoogleLogin,
+  handleEmailLogin,
+  isLoading,
+}) => {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!email || !password) {
+      setError("Please fill in all fields");
+      return;
+    }
+
+    try {
+      await handleEmailLogin(email, password);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Login failed");
+    }
+  };
 
   return (
     <div className="bg-gradient-to-b from-gray-950 to-teal-950/30 rounded-xl shadow-xl border border-gray-800/50 p-8 max-w-md mx-auto">
@@ -37,8 +61,9 @@ const LoginForm: React.FC<LoginFormProps> = ({ handleLogin }) => {
 
       <div className="space-y-6">
         <button
-          onClick={handleLogin}
-          className="w-full flex items-center justify-center bg-white text-gray-800 px-4 py-3 rounded-lg hover:bg-gray-100 transition font-medium focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-white"
+          onClick={handleGoogleLogin}
+          disabled={isLoading}
+          className="w-full flex items-center justify-center bg-white text-gray-800 px-4 py-3 rounded-lg hover:bg-gray-100 transition font-medium focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-white disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label="Sign in with Google"
         >
           <svg
@@ -51,7 +76,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ handleLogin }) => {
               fill="#4285F4"
             />
           </svg>
-          Sign in with Google
+          {isLoading ? "Signing in..." : "Sign in with Google"}
         </button>
 
         <div className="relative">
@@ -65,7 +90,13 @@ const LoginForm: React.FC<LoginFormProps> = ({ handleLogin }) => {
           </div>
         </div>
 
-        <form className="space-y-5">
+        {error && (
+          <div className="p-3 bg-red-500/10 text-red-300 rounded-md text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="space-y-5">
           <div className="space-y-1">
             <label
               htmlFor="email"
@@ -81,6 +112,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ handleLogin }) => {
               className="w-full px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors text-white"
               placeholder="your@email.com"
               required
+              disabled={isLoading}
             />
           </div>
 
@@ -100,12 +132,14 @@ const LoginForm: React.FC<LoginFormProps> = ({ handleLogin }) => {
                 className="w-full px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors text-white pr-10"
                 placeholder="••••••••"
                 required
+                disabled={isLoading}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-300"
                 aria-label={showPassword ? "Hide password" : "Show password"}
+                disabled={isLoading}
               >
                 {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
               </button>
@@ -119,6 +153,7 @@ const LoginForm: React.FC<LoginFormProps> = ({ handleLogin }) => {
                 name="remember-me"
                 type="checkbox"
                 className="h-4 w-4 text-teal-500 focus:ring-teal-500 border-gray-600 rounded bg-gray-700"
+                disabled={isLoading}
               />
               <label
                 htmlFor="remember-me"
@@ -128,20 +163,21 @@ const LoginForm: React.FC<LoginFormProps> = ({ handleLogin }) => {
               </label>
             </div>
             <div className="text-sm">
-              <a
-                href="#"
+              <Link
+                to="/forgot-password"
                 className="font-medium text-teal-400 hover:text-teal-300 transition-colors"
               >
                 Forgot password?
-              </a>
+              </Link>
             </div>
           </div>
 
           <button
             type="submit"
-            className="w-full bg-teal-500 text-white px-4 py-3 rounded-lg hover:bg-teal-600 transition-colors font-medium focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500 mt-2"
+            disabled={isLoading}
+            className="w-full bg-teal-500 text-white px-4 py-3 rounded-lg hover:bg-teal-600 transition-colors font-medium focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500 mt-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sign in
+            {isLoading ? "Signing in..." : "Sign in"}
           </button>
         </form>
       </div>
@@ -149,12 +185,12 @@ const LoginForm: React.FC<LoginFormProps> = ({ handleLogin }) => {
       <div className="mt-8 text-center">
         <p className="text-gray-400">
           Don't have an account?{" "}
-          <a
-            href="#"
+          <Link
+            to="/register"
             className="font-medium text-teal-400 hover:text-teal-300 transition-colors"
           >
             Create account
-          </a>
+          </Link>
         </p>
       </div>
     </div>

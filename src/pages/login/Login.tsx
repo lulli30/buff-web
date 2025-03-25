@@ -3,8 +3,15 @@ import { useAuth } from "../../context/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import LoginForm from "./LoginForm";
 
+interface AuthContextType {
+  user: any; // Replace with your actual user type
+  signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+}
+
 const Login = () => {
-  const { user, signInWithGoogle } = useAuth();
+  const { user, signInWithGoogle, signInWithEmail } =
+    useAuth() as AuthContextType;
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
 
@@ -14,12 +21,24 @@ const Login = () => {
     }
   }, [user, navigate]);
 
-  const handleLogin = async () => {
+  const handleGoogleLogin = async () => {
     try {
       setIsLoading(true);
       await signInWithGoogle();
     } catch (error) {
-      console.error("Login failed:", error);
+      console.error("Google login failed:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleEmailLogin = async (email: string, password: string) => {
+    try {
+      setIsLoading(true);
+      await signInWithEmail(email, password);
+    } catch (error) {
+      console.error("Email login failed:", error);
+      throw error; // Rethrow to be caught by LoginForm
     } finally {
       setIsLoading(false);
     }
@@ -51,7 +70,11 @@ const Login = () => {
           </p>
         </div>
 
-        <LoginForm handleLogin={handleLogin} />
+        <LoginForm
+          handleGoogleLogin={handleGoogleLogin}
+          handleEmailLogin={handleEmailLogin}
+          isLoading={isLoading}
+        />
 
         <div className="text-center mt-8">
           <Link
@@ -79,24 +102,24 @@ const Login = () => {
       <footer className="mt-16 text-sm text-gray-500 text-center">
         <p>© 2025 FitTrack Pro. All rights reserved.</p>
         <div className="mt-2 space-x-4">
-          <a
-            href="#"
+          <Link
+            to="/privacy"
             className="text-gray-500 hover:text-teal-400 transition-colors"
           >
             Privacy Policy
-          </a>
-          <a
-            href="#"
+          </Link>
+          <Link
+            to="/terms"
             className="text-gray-500 hover:text-teal-400 transition-colors"
           >
             Terms of Service
-          </a>
-          <a
-            href="#"
+          </Link>
+          <Link
+            to="/help"
             className="text-gray-500 hover:text-teal-400 transition-colors"
           >
             Help
-          </a>
+          </Link>
         </div>
       </footer>
     </div>
