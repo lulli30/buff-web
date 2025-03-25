@@ -5,18 +5,25 @@ import { db } from "../../../firebaseConfig";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import RegisterForm from "./RegisterForm";
 
+// Enhanced UserData interface
+interface UserData {
+  uid: string;
+  email?: string;
+  displayName?: string;
+  photoURL?: string;
+  fullName?: string;
+}
+
 const Register = () => {
   const { user, signInWithGoogle, signUpWithEmail } = useAuth() as any;
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) navigate("/dashboard");
   }, [user, navigate]);
 
-  /**
-   * Handles Google Sign-In and stores user in Firestore.
-   */
   const handleGoogleRegister = async () => {
     try {
       setIsLoading(true);
@@ -24,54 +31,98 @@ const Register = () => {
       if (!signedInUser || !signedInUser.uid)
         throw new Error("Google sign-in failed.");
 
-      await storeUserInFirestore(signedInUser);
+      await storeUserInFirestore({
+        ...signedInUser,
+        fullName: signedInUser.displayName || "Google User",
+      });
       navigate("/dashboard");
     } catch (error) {
       console.error("❌ Google Registration failed:", error);
+      setError("Google sign-in failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
 
-  /**
-   * Handles Email/Password Sign-Up and stores user in Firestore.
-   */
   const handleEmailRegister = async (
     email: string,
     password: string,
     fullName: string
   ) => {
     try {
-      setIsLoading(true);
-      const registeredUser = await signUpWithEmail(email, password, fullName); // Pass fullName
-      if (!registeredUser || !registeredUser.uid)
-        throw new Error("Email sign-up failed.");
+      if (!fullName.trim()) {
+        throw new Error("Full name is required");
+      }
 
-      await storeUserInFirestore({ ...registeredUser, fullName });
+      setIsLoading(true);
+      setError(null);
+
+      const registeredUser = await signUpWithEmail(email, password, fullName);
+      if (!registeredUser || !registeredUser.uid) {
+        throw new Error("Email sign-up failed.");
+      }
+
+      // Explicitly create user data object
+      const userData = {
+        uid: registeredUser.uid,
+        email: registeredUser.email || email,
+        fullName: fullName, // Directly use the provided fullName
+        photoURL: registeredUser.photoURL || "",
+        displayName: fullName, // Also set displayName for consistency
+      };
+
+      await storeUserInFirestore(userData);
       navigate("/dashboard");
     } catch (error) {
       console.error("❌ Email Registration failed:", error);
+      setError(
+        (error as any).message || "Registration failed. Please try again."
+      );
     } finally {
       setIsLoading(false);
     }
   };
 
-  /**
-   * Stores user data in Firestore if they don’t exist.
-   */
-  const storeUserInFirestore = async (user: any) => {
-    const { uid, displayName, email, photoURL } = user;
-    const memberRef = doc(db, "members", uid);
-    const memberSnapshot = await getDoc(memberRef);
+  const storeUserInFirestore = async (user: UserData) => {
+    try {
+      const { uid, fullName, email, photoURL } = user;
 
-    if (!memberSnapshot.exists()) {
-      await setDoc(memberRef, {
-        uid,
-        fullName: displayName || "Anonymous",
-        email,
-        photoURL: photoURL || "",
-        createdAt: new Date(),
-      });
+      if (!uid) {
+        throw new Error("User ID is missing");
+      }
+
+      const memberRef = doc(db, "members", uid);
+      const memberSnapshot = await getDoc(memberRef);
+      console.log("Before Firestore:", { fullName, email, uid });
+
+      if (!memberSnapshot.exists()) {
+        await setDoc(
+          memberRef,
+          {
+            uid,
+            fullName: fullName || "Anonymous", // Only fallback if fullName is missing
+            email: email || "",
+            photoURL: photoURL || "",
+            createdAt: new Date(),
+            lastUpdated: new Date(),
+          },
+          { merge: true }
+        );
+      } else {
+        // Update existing user if needed
+        await setDoc(
+          memberRef,
+          {
+            fullName:
+              fullName || memberSnapshot.data()?.fullName || "Anonymous",
+            lastUpdated: new Date(),
+          },
+          { merge: true }
+        );
+      }
+    } catch (error) {
+      console.error("Error storing user in Firestore:", error);
+      throw error;
     }
   };
 
@@ -100,6 +151,12 @@ const Register = () => {
             Create your account and start your fitness journey
           </p>
         </div>
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/10 text-red-300 rounded-md text-sm">
+            {error}
+          </div>
+        )}
 
         <RegisterForm
           handleGoogleRegister={handleGoogleRegister}
