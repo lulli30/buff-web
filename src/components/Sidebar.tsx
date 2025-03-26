@@ -31,8 +31,16 @@ interface FirestoreUser {
 
 const navItems: NavItem[] = [
   { path: "/dashboard", label: "Overview", icon: <Home size={24} /> },
-  { path: "/dashboard/subscription", label: "Subscription", icon: <CreditCard size={24} /> },
-  { path: "/dashboard/workout", label: "Workouts", icon: <Dumbbell size={24} /> },
+  {
+    path: "/dashboard/subscription",
+    label: "Subscription",
+    icon: <CreditCard size={24} />,
+  },
+  {
+    path: "/dashboard/workout",
+    label: "Workouts",
+    icon: <Dumbbell size={24} />,
+  },
   { path: "/billing", label: "Billing", icon: <CreditCard size={24} /> },
   { path: "/trainers", label: "Trainers", icon: <Users size={24} /> },
   { path: "/settings", label: "Settings", icon: <Settings size={24} /> },
@@ -41,11 +49,13 @@ const navItems: NavItem[] = [
 const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
   const { user, logout } = useAuth();
   const location = useLocation();
-  const [firestoreUser, setFirestoreUser] = useState<FirestoreUser | null>(null);
-  
+  const [firestoreUser, setFirestoreUser] = useState<FirestoreUser | null>(
+    null
+  );
+
   const fetchUserData = useCallback(async () => {
     if (!user?.uid) return;
-    
+
     try {
       const userDoc = await getDoc(doc(db, "members", user.uid));
       if (userDoc.exists()) {
@@ -62,32 +72,20 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
 
   const isActive = (path: string) => location.pathname === path;
   const profilePhotoUrl = firestoreUser?.photoURL || user?.photoURL;
-  const displayName = firestoreUser?.fullName || user?.displayName || "Welcome";
-  
-  const renderProfileImage = () => {
-    if (profilePhotoUrl) {
-      return (
-        <img
-          src={profilePhotoUrl}
-          alt="Profile"
-          className="w-14 h-14 rounded-full border-2 border-teal-600 object-cover"
-          onError={(e) => {
-            (e.target as HTMLImageElement).style.display = "none";
-            const fallback = document.createElement("div");
-            fallback.className = "w-14 h-14 rounded-full border-2 border-teal-600 bg-gray-800 flex items-center justify-center";
-            fallback.innerHTML = '<svg class="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>';
-            const target = e.target as HTMLImageElement;
-            target.parentNode?.insertBefore(fallback, target.nextSibling);
-          }}
-        />
-      );
-    }
-    return (
+  const displayName = firestoreUser?.fullName || user?.email || "Welcome";
+
+  const renderProfileImage = () =>
+    profilePhotoUrl ? (
+      <img
+        src={profilePhotoUrl}
+        alt="Profile"
+        className="w-14 h-14 rounded-full border-2 border-teal-600 object-cover"
+      />
+    ) : (
       <div className="w-14 h-14 rounded-full border-2 border-teal-600 bg-gray-800 flex items-center justify-center">
         <User className="w-8 h-8 text-gray-300" />
       </div>
     );
-  };
 
   return (
     <div
@@ -149,7 +147,10 @@ const Sidebar = ({ isCollapsed, setIsCollapsed }: SidebarProps) => {
 
       <div className="mt-auto pt-6 border-t border-gray-700">
         <button
-          onClick={logout}
+          onClick={() => {
+            logout();
+            window.location.href = "/login";
+          }}
           className="flex items-center w-full px-5 py-4 text-gray-300 hover:text-white hover:bg-red-600/20 rounded-lg transition-colors"
           aria-label="Logout"
         >
