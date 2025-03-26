@@ -2,32 +2,34 @@ import React, { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 interface RegisterFormProps {
-  handleEmailRegister: (
+  handleRegister: (
     email: string,
-    password: string,
-    fullName: string
+    fullName: string,
+    password: string
   ) => Promise<void>;
-  handleGoogleRegister: () => Promise<void>;
 }
 
-const RegisterForm: React.FC<RegisterFormProps> = ({
-  handleEmailRegister,
-  handleGoogleRegister,
-}) => {
+const RegisterForm: React.FC<RegisterFormProps> = ({ handleRegister }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (password !== confirmPassword) {
-      alert("Passwords do not match!");
+      alert("Passwords don't match!");
       return;
     }
-    await handleEmailRegister(email, password, fullName);
+    setLoading(true);
+    try {
+      await handleRegister(email, fullName, password);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -73,6 +75,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
               className="w-full px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors text-white pr-10"
               placeholder="••••••••"
               required
+              minLength={8}
             />
             <button
               type="button"
@@ -96,6 +99,7 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
               className="w-full px-4 py-3 bg-gray-800/80 border border-gray-700 rounded-lg focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors text-white pr-10"
               placeholder="••••••••"
               required
+              minLength={8}
             />
             <button
               type="button"
@@ -110,28 +114,11 @@ const RegisterForm: React.FC<RegisterFormProps> = ({
         <button
           type="submit"
           className="w-full bg-teal-500 text-white px-4 py-3 rounded-lg hover:bg-teal-600 transition-colors font-medium focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-teal-500 mt-2"
+          disabled={loading}
         >
-          Sign Up
+          {loading ? "Creating account..." : "Sign Up"}
         </button>
       </form>
-
-      <div className="flex items-center my-6">
-        <div className="flex-grow border-t border-gray-700"></div>
-        <span className="px-3 text-gray-400 text-sm">or</span>
-        <div className="flex-grow border-t border-gray-700"></div>
-      </div>
-
-      <button
-        onClick={handleGoogleRegister}
-        className="w-full flex items-center justify-center gap-3 bg-gray-800 hover:bg-gray-700 text-white px-4 py-3 rounded-lg transition-colors border border-gray-600 focus:ring-2 focus:ring-offset-2 focus:ring-offset-gray-900 focus:ring-gray-600"
-      >
-        <img
-          src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
-          alt="Google Logo"
-          className="h-6 w-6"
-        />
-        <span>Sign Up with Google</span>
-      </button>
     </div>
   );
 };

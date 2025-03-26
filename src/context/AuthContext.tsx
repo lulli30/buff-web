@@ -6,23 +6,38 @@ import {
   ReactNode,
   useCallback,
 } from "react";
-import { User } from "firebase/auth";
+import { db } from "../../firebaseConfig";
 import {
-  authStateListener,
-  signInWithGoogle as firebaseSignInWithGoogle,
-  signInWithEmail as firebaseSignInWithEmail,
-  signUpWithEmail as firebaseSignUpWithEmail,
-  logout as firebaseLogout,
-} from "../services/auth";
+  collection,
+  doc,
+  getDoc,
+  getDocs,
+  query,
+  setDoc,
+  Timestamp,
+  where,
+} from "firebase/firestore";
+import { hashPassword, verifyPassword } from "../utils/authUtils";
+
+interface User {
+  uid: string;
+  email: string;
+  fullName: string;
+  photoURL: string;
+  // Add other user properties as needed
+}
 
 interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   error: string | null;
-  signInWithGoogle: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (email: string, password: string) => Promise<User | null>;
-  logout: () => Promise<void>;
+  signUpWithEmail: (
+    email: string,
+    password: string,
+    fullName: string
+  ) => Promise<void>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -32,28 +47,31 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Initialize auth state listener
+  // Check for existing session on initial load
   useEffect(() => {
-    const unsubscribe = authStateListener((authUser) => {
-      console.log("👤 Firebase Auth State Changed:", authUser);
-      setUser(authUser);
-      setIsLoading(false);
-    });
+    const checkSession = async () => {
+      try {
+        const userId = sessionStorage.getItem("userId");
+        if (!userId) {
+          setIsLoading(false);
+          return;
+        }
 
-    return unsubscribe;
-  }, []);
+        const userDoc = await getDoc(doc(db, "members", userId));
+        if (userDoc.exists()) {
+          setUser({
+            uid: userDoc.id,
+            ...userDoc.data(),
+          } as User);
+        }
+      } catch (err) {
+        console.error("Session check failed:", err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
 
-  const signInWithGoogle = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const loggedInUser = await firebaseSignInWithGoogle();
-      if (loggedInUser) setUser(loggedInUser);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Google sign-in failed");
-    } finally {
-      setIsLoading(false);
-    }
+    checkSession();
   }, []);
 
   const signInWithEmail = useCallback(
@@ -61,11 +79,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsLoading(true);
       setError(null);
       try {
-        const loggedInUser = await firebaseSignInWithEmail(email, password);
-        if (loggedInUser) setUser(loggedInUser);
+        // Query Firestore for user by email
+        const querySnapshot = await getDocs(
+          query(collection(db, "members"), where("email", "==", email))
+        );
+
+        if (querySnapshot.empty) {
+          throw new Error("User not found");
+        }
+
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+
+        if (!userData.passwordHash) {
+          throw new Error("Authentication error: No password found for user.");
+        }
+
+        // Verify password
+        const isValid = await verifyPassword(password, userData.passwordHash);
+        if (!isValid) {
+          throw new Error("Invalid password");
+        }
+
+        // Set user session
+        const userObject: User = {
+          uid: userDoc.id,
+          email: userData.email,
+          fullName: userData.fullName,
+          photoURL: userData.photoURL || "",
+        };
+
+        setUser(userObject);
+        sessionStorage.setItem("userId", userDoc.id);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Email sign-in failed");
-        throw err; // Re-throw for form handling
+        setError(err instanceof Error ? err.message : "Login failed");
+        throw err;
       } finally {
         setIsLoading(false);
       }
@@ -74,16 +122,58 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   );
 
   const signUpWithEmail = useCallback(
-    async (email: string, password: string) => {
+    async (email: string, password: string, fullName: string) => {
       setIsLoading(true);
       setError(null);
       try {
-        const registeredUser = await firebaseSignUpWithEmail(email, password);
-        if (registeredUser) setUser(registeredUser);
-        return registeredUser;
+        // Check if email already exists
+        const querySnapshot = await getDocs(
+          query(collection(db, "members"), where("email", "==", email))
+        );
+
+        if (!querySnapshot.empty) {
+          throw new Error("Email already in use");
+        }
+
+        // Hash password
+        const passwordHash = await hashPassword(password);
+
+        // Create user document
+        const userId = `user_${Date.now()}`;
+        const userDoc = {
+          email,
+          fullName,
+          passwordHash,
+          photoURL: "",
+          createdAt: Timestamp.now(),
+          lastUpdated: Timestamp.now(),
+          membership: {
+            plan: "No Plan",
+            status: "Expired",
+            startDate: "Not started",
+            nextPayment: "Not applicable",
+            memberSince: new Date().toLocaleDateString("en-US", {
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            }),
+          },
+          sessions: [],
+          payments: [],
+          assignedTrainer: null,
+        };
+
+        await setDoc(doc(db, "members", userId), userDoc);
+
+        // Set user session
+        setUser({
+          uid: userId,
+          ...userDoc,
+        } as User);
+        sessionStorage.setItem("userId", userId);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Sign-up failed");
-        throw err; // Re-throw for form handling
+        setError(err instanceof Error ? err.message : "Registration failed");
+        throw err;
       } finally {
         setIsLoading(false);
       }
@@ -91,17 +181,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     []
   );
 
-  const logout = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      await firebaseLogout();
-      setUser(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Logout failed");
-    } finally {
-      setIsLoading(false);
-    }
+  const logout = useCallback(() => {
+    setUser(null);
+    sessionStorage.removeItem("userId");
   }, []);
 
   if (isLoading) {
@@ -121,7 +203,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         isLoading,
         error,
-        signInWithGoogle,
         signInWithEmail,
         signUpWithEmail,
         logout,

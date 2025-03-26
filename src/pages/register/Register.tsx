@@ -1,128 +1,78 @@
-import { useEffect, useState } from "react";
-import { useAuth } from "../../context/AuthContext";
+import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { db } from "../../../firebaseConfig";
-import { doc, setDoc, getDoc } from "firebase/firestore";
+import { doc, setDoc, Timestamp } from "firebase/firestore";
+import { hashPassword } from "../../utils/authUtils";
 import RegisterForm from "./RegisterForm";
 
-// Enhanced UserData interface
-interface UserData {
-  uid: string;
-  email?: string;
-  displayName?: string;
-  photoURL?: string;
-  fullName?: string;
+interface FirestoreUser {
+  email: string;
+  fullName: string;
+  passwordHash: string;
+  photoURL: string;
+  createdAt: Timestamp;
+  lastUpdated: Timestamp;
+  membership: {
+    plan: string;
+    status: "Active" | "Expired" | "Paused";
+    startDate: string;
+    nextPayment: string;
+    memberSince: string;
+  };
+  sessions: any[];
+  payments: any[];
+  assignedTrainer: null;
 }
 
 const Register = () => {
-  const { user, signInWithGoogle, signUpWithEmail } = useAuth() as any;
   const navigate = useNavigate();
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (user) navigate("/dashboard");
-  }, [user, navigate]);
-
-  const handleGoogleRegister = async () => {
-    try {
-      setIsLoading(true);
-      const signedInUser = await signInWithGoogle();
-      if (!signedInUser || !signedInUser.uid)
-        throw new Error("Google sign-in failed.");
-
-      await storeUserInFirestore({
-        ...signedInUser,
-        fullName: signedInUser.displayName || "Google User",
-      });
-      navigate("/dashboard");
-    } catch (error) {
-      console.error("❌ Google Registration failed:", error);
-      setError("Google sign-in failed. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleEmailRegister = async (
+  const createUserDocument = async (
     email: string,
-    password: string,
-    fullName: string
+    fullName: string,
+    password: string
   ) => {
     try {
-      if (!fullName.trim()) {
-        throw new Error("Full name is required");
-      }
+      const currentDate = new Date();
+      const formattedDate = currentDate.toLocaleDateString("en-US", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      });
 
-      setIsLoading(true);
-      setError(null);
+      // Generate a user ID
+      const userId = `user_${Date.now()}`;
 
-      const registeredUser = await signUpWithEmail(email, password, fullName);
-      if (!registeredUser || !registeredUser.uid) {
-        throw new Error("Email sign-up failed.");
-      }
+      // Hash the password before storing
+      const passwordHash = await hashPassword(password);
 
-      // Explicitly create user data object
-      const userData = {
-        uid: registeredUser.uid,
-        email: registeredUser.email || email,
-        fullName: fullName, // Directly use the provided fullName
-        photoURL: registeredUser.photoURL || "",
-        displayName: fullName, // Also set displayName for consistency
+      const userDoc: FirestoreUser = {
+        email,
+        fullName,
+        passwordHash,
+        photoURL: "",
+        createdAt: Timestamp.now(),
+        lastUpdated: Timestamp.now(),
+        membership: {
+          plan: "No Plan",
+          status: "Expired",
+          startDate: "Not started",
+          nextPayment: "Not applicable",
+          memberSince: formattedDate,
+        },
+        sessions: [],
+        payments: [],
+        assignedTrainer: null,
       };
 
-      await storeUserInFirestore(userData);
+      await setDoc(doc(db, "members", userId), userDoc);
       navigate("/dashboard");
     } catch (error) {
-      console.error("❌ Email Registration failed:", error);
+      console.error("Error creating user:", error);
       setError(
-        (error as any).message || "Registration failed. Please try again."
+        (error as any).message || "Failed to create account. Please try again."
       );
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const storeUserInFirestore = async (user: UserData) => {
-    try {
-      const { uid, fullName, email, photoURL } = user;
-
-      if (!uid) {
-        throw new Error("User ID is missing");
-      }
-
-      const memberRef = doc(db, "members", uid);
-      const memberSnapshot = await getDoc(memberRef);
-      console.log("Before Firestore:", { fullName, email, uid });
-
-      if (!memberSnapshot.exists()) {
-        await setDoc(
-          memberRef,
-          {
-            uid,
-            fullName: fullName || "Anonymous", // Only fallback if fullName is missing
-            email: email || "",
-            photoURL: photoURL || "",
-            createdAt: new Date(),
-            lastUpdated: new Date(),
-          },
-          { merge: true }
-        );
-      } else {
-        // Update existing user if needed
-        await setDoc(
-          memberRef,
-          {
-            fullName:
-              fullName || memberSnapshot.data()?.fullName || "Anonymous",
-            lastUpdated: new Date(),
-          },
-          { merge: true }
-        );
-      }
-    } catch (error) {
-      console.error("Error storing user in Firestore:", error);
-      throw error;
     }
   };
 
@@ -158,10 +108,7 @@ const Register = () => {
           </div>
         )}
 
-        <RegisterForm
-          handleGoogleRegister={handleGoogleRegister}
-          handleEmailRegister={handleEmailRegister}
-        />
+        <RegisterForm handleRegister={createUserDocument} />
 
         <div className="text-center mt-8">
           <p className="text-gray-400">
