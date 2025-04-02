@@ -315,15 +315,31 @@ interface ExpiredActionProps {
   onMakePayment?: () => void;
 }
 
-const ExpiredAction = ({ onMakePayment }: ExpiredActionProps) => (
-  <button
-    className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white px-4 py-3 rounded-lg font-medium hover:from-red-500 hover:to-red-400 transition flex items-center justify-center shadow-md"
-    onClick={onMakePayment}
-  >
-    <CreditCard className="h-5 w-5 mr-2" />
-    Make a Payment
-  </button>
-);
+interface ExpiredActionProps {
+  onMakePayment?: () => void;
+}
+
+const ExpiredAction = ({ onMakePayment }: ExpiredActionProps) => {
+  const navigate = useNavigate();
+
+  const handleMakePayment = () => {
+    if (onMakePayment) {
+      onMakePayment();
+    } else {
+      navigate("/dashboard/subscription"); // Redirect to subscription page
+    }
+  };
+
+  return (
+    <button
+      className="w-full bg-gradient-to-r from-red-600 to-red-500 text-white px-4 py-3 rounded-lg font-medium hover:from-red-500 hover:to-red-400 transition flex items-center justify-center shadow-md"
+      onClick={handleMakePayment}
+    >
+      <CreditCard className="h-5 w-5 mr-2" />
+      Make a Payment
+    </button>
+  );
+};
 
 const CanceledAction = () => (
   <a

@@ -35,7 +35,7 @@ interface FirestoreUser {
   displayName?: string;
   email?: string | null;
   photoURL?: string | null;
-  membership?: SubscriptionData;
+  membership?: SubscriptionData | null; // Ensure it's nullable
   payments?: Payment[];
 }
 
@@ -48,8 +48,8 @@ const Subscription = () => {
     null
   );
   const [loading, setLoading] = useState(true);
-  const [availablePlans, setAvailablePlans] = useState<AvailablePlan[]>([]); // state to store fetched plans
-  const [currentPlanId, setCurrentPlanId] = useState<number | null>(null); // state to store current plan id
+  const [availablePlans, setAvailablePlans] = useState<AvailablePlan[]>([]);
+  const [currentPlanId, setCurrentPlanId] = useState<number | null>(null);
 
   useEffect(() => {
     const fetchSubscriptionData = async () => {
@@ -66,9 +66,12 @@ const Subscription = () => {
           const data = userDoc.data() as FirestoreUser;
           setFirestoreUser(data);
 
-          if (data.membership) {
+          if (data.membership && data.membership.plan) {
             setSubscriptionData(data.membership);
+          } else {
+            setSubscriptionData(null); // Ensure no plan is displayed if missing
           }
+
           setPayments(data.payments || []);
         } else {
           console.warn("No membership document found.");
@@ -101,7 +104,7 @@ const Subscription = () => {
           });
         });
 
-        setAvailablePlans(fetchedPlans); // Set the fetched plans in state
+        setAvailablePlans(fetchedPlans);
       } catch (error) {
         console.error("Error fetching plans:", error);
       }
@@ -110,17 +113,21 @@ const Subscription = () => {
     fetchPlans();
   }, []);
 
-  // Check if the current plan is in the available plans
+  // Determine the current plan ID correctly
   useEffect(() => {
     if (subscriptionData && availablePlans.length > 0) {
       const currentPlan = availablePlans.find(
         (plan) => plan.name === subscriptionData.plan
       );
       if (currentPlan) {
-        setCurrentPlanId(currentPlan.id); // Set current plan id after plans are fetched
+        setCurrentPlanId(currentPlan.id);
+      } else {
+        setCurrentPlanId(null); // Ensure no incorrect highlighting
       }
+    } else {
+      setCurrentPlanId(null); // If no subscription data, reset plan ID
     }
-  }, [availablePlans, subscriptionData]); // Dependency on availablePlans and subscriptionData
+  }, [availablePlans, subscriptionData]);
 
   const getUserName = () =>
     firestoreUser?.fullName || firestoreUser?.displayName || "Member";
@@ -150,28 +157,43 @@ const Subscription = () => {
                     Manage Your Subscription, {getFirstName()}!
                   </h2>
                   <p className="mt-2 text-gray-300">
-                    You are currently on the{" "}
-                    <span className="font-semibold">
-                      {subscriptionData?.plan || "No Plan"}
-                    </span>{" "}
-                    plan.
+                    {subscriptionData ? (
+                      <>
+                        You are currently on the{" "}
+                        <span className="font-semibold">
+                          {subscriptionData.plan}
+                        </span>{" "}
+                        plan.
+                      </>
+                    ) : (
+                      <span className="text-red-400 font-semibold">
+                        You have no active plan.
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
 
               {/* Subscription Details */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {subscriptionData && (
+              {subscriptionData ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <SubscriptionPlan subscriptionData={subscriptionData} />
-                )}
-                <PaymentDetails payments={payments} />
-              </div>
+                  <PaymentDetails payments={payments} />
+                </div>
+              ) : (
+                <div className="text-center bg-gray-900 p-6 rounded-lg shadow-md">
+                  <p className="text-gray-300">
+                    You currently have no subscription plan. Browse available
+                    plans below.
+                  </p>
+                </div>
+              )}
 
               {/* Upgrade Plan Section */}
               <div className="mt-6">
                 <UpgradePlan
                   availablePlans={availablePlans}
-                  currentPlanId={currentPlanId || 1} // Ensure currentPlanId is set correctly
+                  currentPlanId={currentPlanId ?? -1}
                   onUpgrade={handleUpgrade}
                 />
               </div>
