@@ -87,19 +87,21 @@ const PaymentHistory = ({ payments }: Props) => {
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm text-gray-300">
           <thead className="uppercase text-xs text-gray-400 border-b border-gray-700">
-            {["date", "amount", "status", "method"].map((col) => (
-              <th
-                key={col}
-                className="py-3 px-6 cursor-pointer hover:text-teal-400"
-                onClick={() => handleSort(col as keyof Payment)}
-                aria-label={`Sort by ${col}`}
-              >
-                <div className="flex items-center justify-between">
-                  {col.charAt(0).toUpperCase() + col.slice(1)}
-                  {sortBy === col && <ArrowUpDown className="h-3 w-3 ml-1" />}
-                </div>
-              </th>
-            ))}
+            <tr>
+              {["date", "amount", "status", "method"].map((col) => (
+                <th
+                  key={col}
+                  className="py-3 px-6 cursor-pointer hover:text-teal-400"
+                  onClick={() => handleSort(col as keyof Payment)}
+                  aria-label={`Sort by ${col}`}
+                >
+                  <div className="flex items-center justify-between">
+                    {col.charAt(0).toUpperCase() + col.slice(1)}
+                    {sortBy === col && <ArrowUpDown className="h-3 w-3 ml-1" />}
+                  </div>
+                </th>
+              ))}
+            </tr>
           </thead>
           <tbody>
             {filteredPayments.length > 0 ? (
